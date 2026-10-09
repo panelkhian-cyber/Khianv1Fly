@@ -1,0 +1,104 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+local flying, speed, vertical = false, 50, 0
+local bv, bg, conn
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "GrayFly"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 170, 0, 150)
+frame.Position = UDim2.new(0.05, 0, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+frame.Active, frame.Draggable = true, true
+Instance.new("UICorner", frame)
+
+local function makeBtn(text, x, y, w, h)
+	local b = Instance.new("TextButton", frame)
+	b.Text = text
+	b.Size = UDim2.new(0, w, 0, h)
+	b.Position = UDim2.new(0, x, 0, y)
+	b.BackgroundColor3 = Color3.fromRGB(110, 110, 110)
+	b.TextColor3 = Color3.fromRGB(235, 235, 235)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	Instance.new("UICorner", b)
+	return b
+end
+
+local toggle = makeBtn("Fly: OFF", 10, 10, 150, 35)
+local up = makeBtn("UP", 10, 55, 70, 35)
+local down = makeBtn("DOWN", 90, 55, 70, 35)
+
+-- Speed input (1 to 100)
+local box = Instance.new("TextBox", frame)
+box.Size = UDim2.new(0, 150, 0, 35)
+box.Position = UDim2.new(0, 10, 0, 100)
+box.BackgroundColor3 = Color3.fromRGB(110, 110, 110)
+box.TextColor3 = Color3.fromRGB(235, 235, 235)
+box.PlaceholderText = "Speed (1-100)"
+box.PlaceholderColor3 = Color3.fromRGB(190, 190, 190)
+box.Text = tostring(speed)
+box.ClearTextOnFocus = true
+box.Font = Enum.Font.GothamBold
+box.TextSize = 14
+Instance.new("UICorner", box)
+
+box.FocusLost:Connect(function()
+	local n = tonumber(box.Text)
+	if n then
+		speed = math.clamp(math.floor(n), 1, 100)
+	end
+	box.Text = tostring(speed)
+end)
+
+local function stop()
+	flying = false
+	if conn then conn:Disconnect() end
+	if bv then bv:Destroy() end
+	if bg then bg:Destroy() end
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum then hum.PlatformStand = false end
+	toggle.Text = "Fly: OFF"
+end
+
+local function start()
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not (hrp and hum) then return end
+	flying = true
+	toggle.Text = "Fly: ON"
+	hum.PlatformStand = true
+
+	bv = Instance.new("BodyVelocity", hrp)
+	bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+	bv.Velocity = Vector3.zero
+	bg = Instance.new("BodyGyro", hrp)
+	bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+	bg.P = 9000
+
+	conn = RunService.RenderStepped:Connect(function()
+		local cam = workspace.CurrentCamera
+		local rel = cam.CFrame:VectorToObjectSpace(hum.MoveDirection)
+		local dir = cam.CFrame.RightVector * rel.X + cam.CFrame.LookVector * -rel.Z
+		bv.Velocity = dir * speed + Vector3.new(0, vertical * speed, 0)
+		bg.CFrame = cam.CFrame
+	end)
+end
+
+toggle.MouseButton1Click:Connect(function()
+	if flying then stop() else start() end
+end)
+
+up.MouseButton1Down:Connect(function() vertical = 1 end)
+up.MouseButton1Up:Connect(function() vertical = 0 end)
+down.MouseButton1Down:Connect(function() vertical = -1 end)
+down.MouseButton1Up:Connect(function() vertical = 0 end)
+
+player.CharacterAdded:Connect(stop)
